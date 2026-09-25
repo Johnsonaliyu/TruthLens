@@ -1,0 +1,269 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: dashboard
+    description: TruthLens dashboard operations
+  - name: whatsapp
+    description: WhatsApp pairing and bot status
+  - name: verification
+    description: Fact-checking and verification operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Current TruthLens summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /whatsapp/status:
+    get:
+      operationId: getWhatsappStatus
+      tags: [whatsapp]
+      summary: Get WhatsApp connection status
+      responses:
+        "200":
+          description: WhatsApp status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappStatus"
+  /whatsapp/session/start:
+    post:
+      operationId: startWhatsappSession
+      tags: [whatsapp]
+      summary: Start or resume the WhatsApp session
+      responses:
+        "200":
+          description: Session start result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappStatus"
+  /whatsapp/session/disconnect:
+    post:
+      operationId: disconnectWhatsappSession
+      tags: [whatsapp]
+      summary: Disconnect the WhatsApp session
+      responses:
+        "200":
+          description: Disconnected status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappStatus"
+  /whatsapp/qr:
+    get:
+      operationId: getWhatsappQr
+      tags: [whatsapp]
+      summary: Get the current QR code
+      responses:
+        "200":
+          description: QR code status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappQr"
+  /verifications:
+    get:
+      operationId: listVerifications
+      tags: [verification]
+      summary: List recent verification results
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Recent verification results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Verification"
+    post:
+      operationId: createVerification
+      tags: [verification]
+      summary: Verify a text claim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationInput"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Verification"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    WhatsappStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [idle, connecting, qr_ready, connected, disconnected, error]
+        phone:
+          type: ["string", "null"]
+        displayName:
+          type: ["string", "null"]
+        qr:
+          type: ["string", "null"]
+        lastConnectedAt:
+          type: ["string", "null"]
+        lastError:
+          type: ["string", "null"]
+      required: [status, phone, displayName, qr, lastConnectedAt, lastError]
+    WhatsappQr:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [idle, connecting, qr_ready, connected, disconnected, error]
+        qr:
+          type: ["string", "null"]
+      required: [status, qr]
+    DashboardSummary:
+      type: object
+      properties:
+        whatsapp:
+          $ref: "#/components/schemas/WhatsappStatus"
+        totalVerifications:
+          type: integer
+        verifiedToday:
+          type: integer
+        flaggedToday:
+          type: integer
+        averageConfidence:
+          type: number
+        providerHealth:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderHealth"
+        recent:
+          type: array
+          items:
+            $ref: "#/components/schemas/Verification"
+      required:
+        - whatsapp
+        - totalVerifications
+        - verifiedToday
+        - flaggedToday
+        - averageConfidence
+        - providerHealth
+        - recent
+    ProviderHealth:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+          enum: [ready, missing, error]
+        detail:
+          type: string
+      required: [name, role, status, detail]
+    VerificationInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+        source:
+          type: string
+          enum: [dashboard, whatsapp]
+          default: dashboard
+      required: [content]
+    Verification:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        verdict:
+          type: string
+          enum: [likely_true, likely_false, mixed, insufficient_evidence]
+        confidence:
+          type: number
+        summary:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationSource"
+        aiProvider:
+          type: string
+        createdAt:
+          type: string
+        source:
+          type: string
+      required:
+        - id
+        - content
+        - verdict
+        - confidence
+        - summary
+        - sources
+        - aiProvider
+        - createdAt
+        - source
+    VerificationSource:
+      type: object
+      properties:
+        provider:
+          type: string
+        title:
+          type: string
+        url:
+          type: ["string", "null"]
+        snippet:
+          type: string
+        verdict:
+          type: ["string", "null"]
+      required: [provider, title, url, snippet, verdict]
+
